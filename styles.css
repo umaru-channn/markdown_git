@@ -1,0 +1,1452 @@
+/* Markdown IDE - レイアウト案統合版 */
+
+html, body {
+    margin: 0; padding: 0; height: 100vh;
+    /* 日本語フォントを優先して見やすくする */
+    font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+    background-color: #f0f2f5; color: #333; overflow: hidden;
+    
+    /* ★追加: アプリ全体のテキスト選択を無効化（ネイティブアプリ風の挙動） */
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: default; /* 基本カーソルを矢印に */
+}
+
+:root {
+    --sidebar-bg: #2c3e50;
+    --topbar-bg: #eaf1f6;
+    --topbar-border: #c9d6e2;
+    --activitybar-width: 50px;
+    --leftpane-width: 240px;
+    --leftslot-bg: #f5f9fd;
+    --right-pane-width: 350px;
+    /* ★追加: 現在の左ペイン幅を管理する変数（JSで制御） */
+    --current-left-pane-width: 240px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ★追加: 入力フォームとテキストエリアは常に選択・編集可能にする */
+input, textarea {
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+}
+
+.ide-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* ========== トップバー ========== */
+.top-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 6px 10px 6px 0;
+    background: var(--topbar-bg);
+    border-bottom: 1px solid var(--topbar-border);
+    position: relative;
+    z-index: 2;
+    height: 40px;
+    -webkit-app-region: drag;
+}
+
+.top-bar button, 
+.window-control-btn,
+.editor-tabs .tab {
+    -webkit-app-region: no-drag;
+}
+
+.top-left-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.top-left-controls .left-slot {
+    width: var(--activitybar-width);
+    height: 100%;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.top-left-controls .side-switch-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.top-left-controls button,
+.top-left-controls .side-switch-group button {
+    padding: 4px 8px;
+    font-size: 14px;
+    cursor: pointer;
+    background: #f6f6f6;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.top-left-controls button:hover,
+.top-left-controls .side-switch-group button:hover {
+    background-color: #e8e8e8;
+}
+
+.ide-container:not(.left-pane-hidden) .top-left-controls {
+    width: calc(var(--activitybar-width) + var(--leftpane-width));
+}
+
+.ide-container.left-pane-hidden .top-left-controls {
+    width: var(--activitybar-width);
+}
+
+.ide-container.left-pane-hidden .side-switch-group {
+    display: none;
+}
+
+.top-bar .editor-tabs {
+    flex: 1;
+    display: flex;
+    border-left: none;
+}
+
+.editor-tabs {
+    display: flex;
+    border-bottom: none;
+    background-color: var(--topbar-bg);
+    flex-shrink: 0;
+    transition: height 0.2s ease, opacity 0.2s ease;
+    position: relative;
+}
+
+.editor-tabs .tab {
+    border-bottom: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 14px;
+    position: relative;
+    top: 1px;
+    background: transparent;
+    border: none;
+}
+
+.editor-tabs .tab.active {
+    background-color: #ffffff;
+    border-bottom: none;
+    padding-bottom: 10px;
+    margin-bottom: -1px;
+}
+
+.editor-tabs .tab .close-tab {
+    margin-left: 10px;
+    font-weight: bold;
+    opacity: 0.5;
+    padding: 2px 4px;
+    cursor: pointer;
+}
+
+.editor-tabs .tab .close-tab:hover {
+    opacity: 1;
+    background-color: #eee;
+    border-radius: 3px;
+}
+
+/* トップバー右側コントロール */
+.top-right-controls {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+    padding: 0;
+    z-index: 10;
+    -webkit-app-region: no-drag;
+}
+
+/* ウィンドウコントロールボタン */
+.window-control-btn {
+    -webkit-app-region: no-drag;
+    width: 46px;
+    height: 100%;
+    background-color: transparent;
+    border: none;
+    color: #000000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: default;
+    outline: none;
+    transition: background-color 0.1s;
+    padding: 0;
+}
+
+.window-control-btn:not(.close):hover {
+    background-color: #e5e5e5; 
+}
+
+.window-control-btn:not(.close):active {
+    background-color: #cccccc;
+}
+
+.window-control-btn.close:hover {
+    background-color: #e81123;
+    color: #ffffff;
+}
+
+.window-control-btn.close:active {
+    background-color: #f1707a;
+    color: #ffffff;
+}
+
+.window-control-btn svg path,
+.window-control-btn svg rect,
+.window-control-btn svg polygon {
+    fill: currentColor;
+}
+
+.window-control-btn svg.hidden {
+    display: none;
+}
+
+/* ========== メインコンテンツ ========== */
+.main-content {
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+    overflow: hidden;
+    margin-left: var(--activitybar-width);
+    margin-right: var(--activitybar-width);
+    transition: margin-right 0.2s ease;
+    --right-pane-width: 350px;
+}
+
+.main-content:has(.right-pane:not(.hidden)) {
+    margin-right: calc(var(--right-pane-width) + var(--activitybar-width));
+}
+
+.main-content:has(.right-activity-bar.hidden) {
+    margin-right: 0;
+}
+
+/* ========== アクティビティバー ========== */
+.activity-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 24px;
+    width: var(--activitybar-width);
+    background-color: var(--sidebar-bg);
+    color: white;
+    padding-top: 10px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: width 0.2s ease;
+}
+
+.activity-bar .icon {
+    font-size: 24px;
+    padding: 12px 0;
+    width: 100%;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.activity-bar .icon:hover {
+    opacity: 1;
+}
+
+.activity-bar .icon.active {
+    opacity: 1;
+    color: #3498db;
+}
+
+.activity-bar .spacer {
+    flex-grow: 1;
+}
+
+/* ========== 左ペイン ========== */
+.left-pane {
+    width: var(--leftpane-width);
+    background-color: #ffffff;
+    border-right: 1px solid #d9d9d9;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: width 0.2s ease, opacity 0.2s ease;
+}
+
+.left-pane.hidden {
+    width: 0;
+    opacity: 0;
+    border: none;
+    overflow: hidden;
+}
+
+.left-pane-header {
+    padding: 8px 15px;
+    font-weight: bold;
+    border-bottom: 1px solid #d9d9d9;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+}
+
+.left-pane-header .header-buttons {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.left-pane-header .header-buttons.content-hidden {
+    display: none !important;
+}
+
+.header-btn {
+    background-color: transparent;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px 6px;
+    color: #333;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.header-btn:hover {
+    opacity: 1;
+    background-color: #e8e8e8;
+    border-radius: 3px;
+}
+
+/* ★変更: left-pane-content をファイルツリーにも適用し、スクロールを有効にする */
+.left-pane-content {
+    padding: 0 15px; /* ファイルツリーのコンテンツはツリー構造のインデントを考慮してパディングを調整 */
+    overflow-y: auto;
+    flex-grow: 1;
+    font-size: 14px;
+}
+
+/* ファイルエクスプローラー用のコンテンツIDに、他のコンテンツと同じパディングを設定 */
+#content-files {
+    padding: 5px 0 10px 0; /* ツリーの上下のパディングを調整 */
+    overflow-y: auto;
+    flex-grow: 1;
+}
+/* GitとOutlineのパディングを維持 */
+#content-git, #content-outline {
+    padding: 15px;
+}
+
+.left-pane-content ul {
+    list-style-type: none;
+    padding-left: 10px;
+    margin: 0;
+}
+
+.left-pane-content li {
+    padding: 3px 0;
+}
+
+/* アウトライン専用スタイル */
+#outline-tree {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.outline-item {
+    cursor: pointer;
+    padding: 4px 8px;
+    color: #555;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background-color 0.1s;
+    line-height: 1.4;
+}
+
+.outline-item:hover {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.outline-item.active {
+    background-color: #e0e8f0;
+    color: inherit;
+    border: 1px solid #b0c4de;
+}
+
+.hidden-outline-item {
+    display: none;
+}
+
+.outline-text {
+    vertical-align: middle;
+}
+
+.left-pane-content .git-changes {
+    color: #d48806;
+}
+
+.left-pane-content .outline-h1 {
+    font-weight: bold;
+}
+
+.left-pane-content .outline-h2 {
+    padding-left: 15px;
+}
+
+/* ファイルツリー */
+.file-tree {
+    user-select: none;
+}
+
+.tree-item {
+    display: flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 4px 0 15px; /* ルート要素のパディングを調整 */
+    cursor: pointer;
+    border: 1px solid transparent;
+    gap: 2px;
+}
+
+/* ルートフォルダのパディングを調整 */
+#file-tree-container > .tree-item.expanded {
+    padding-left: 5px;
+}
+
+.tree-item:hover {
+    background-color: #f0f0f0;
+}
+
+.tree-item.selected {
+    background-color: #e0e8f0 !important;
+    border-color: #b0c4de;
+    color: inherit;
+}
+
+.tree-toggle {
+    width: 20px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #999;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.tree-icon {
+    width: 20px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    margin-right: 2px;
+    flex-shrink: 0;
+}
+
+.tree-label {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-top: 1px;
+    line-height: 22px;
+}
+
+.tree-children {
+    margin-left: 10px;
+    border-left: 1px solid #404040;
+}
+
+/* Git セクション */
+.git-section {
+    margin-bottom: 20px;
+}
+
+.git-section-title {
+    font-weight: bold;
+    padding: 8px 0;
+    border-bottom: 1px solid #d9d9d9;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #666;
+}
+
+.git-file-list {
+    margin-bottom: 10px;
+}
+
+.git-commit-area {
+    margin-top: 20px;
+    border-top: 1px solid #d9d9d9;
+    padding-top: 10px;
+}
+
+.git-commit-area textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #d9d9d9;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: monospace;
+}
+
+.git-action-btn {
+    width: 100%;
+    padding: 6px;
+    margin-top: 5px;
+    background-color: #007acc;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.git-action-btn:hover {
+    background-color: #005a9e;
+}
+
+/* ========== 右アクティビティバー ========== */
+.right-activity-bar {
+    position: fixed;
+    top: 40px;
+    right: 0;
+    bottom: 24px;
+    width: var(--activitybar-width);
+    background-color: var(--sidebar-bg);
+    color: white;
+    padding-top: 10px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: width 0.2s ease;
+    z-index: 1;
+}
+
+.right-activity-bar.hidden {
+    width: 0;
+    border: none;
+    overflow: hidden;
+}
+
+.right-activity-bar .icon {
+    font-size: 24px;
+    padding: 12px 0;
+    width: 100%;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.right-activity-bar .icon:hover {
+    opacity: 1;
+}
+
+.right-activity-bar .icon.active {
+    opacity: 1;
+    color: #3498db;
+}
+
+/* ========== 中央ペイン ========== */
+.center-pane {
+    flex-grow: 1;
+    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.toolbar {
+    padding: 8px 18px;
+    border: none;
+    border-bottom: 1px solid #d9d9d9;
+    background-color: #fafafa;
+    flex-shrink: 0;
+    transition: height 0.2s ease, opacity 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: -1px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.toolbar .toolbar-left,
+.toolbar .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.toolbar button {
+    margin-left: 0;
+    padding: 4px 8px;
+    background-color: #ffffff;
+    border: 1px solid #d9d9d9;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-size: 13px;
+}
+
+.toolbar button:hover {
+    background-color: #f0f0f0;
+}
+
+.toolbar-group {
+    display: flex;
+    gap: 5px;
+    padding: 0 5px;
+    border-right: 1px solid #d9d9d9;
+    align-items: center;
+}
+
+.toolbar-group:last-child {
+    border-right: none;
+}
+
+.toolbar-group select,
+.toolbar-group input[type="color"] {
+    padding: 4px 8px;
+    border: 1px solid #d9d9d9;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.toolbar-group input[type="color"] {
+    width: 40px;
+    height: 32px;
+    padding: 2px;
+}
+
+.editor-area {
+    flex-grow: 1;
+    padding: 20px;
+    font-size: 16px;
+    line-height: 1.7;
+    overflow-y: auto;
+}
+
+.editor-area h1 {
+    border-bottom: 2px solid #eee;
+    padding-bottom: 5px;
+    margin-top: 0;
+}
+
+.editor-area h2 {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 3px;
+    margin-top: 30px;
+}
+
+.editor-area code {
+    background-color: #eee;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-family: "SFMono-Regular", Consolas, "Courier New", "Hiragino Kaku Gothic ProN", "Meiryo", monospace;
+}
+
+.editor-wrapper {
+    display: flex;
+    flex-grow: 1;
+    gap: 0;
+}
+
+#editor {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    outline: none;
+    font-size: 15px;
+    font-family: "SFMono-Regular", Consolas, "Courier New", "Hiragino Kaku Gothic ProN", "Meiryo", monospace;
+    line-height: 1.6;
+    border: none;
+    resize: none;
+    background-color: #ffffff;
+    color: #333;
+    /* ★追加: エディタエリアはテキスト選択を許可 */
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+}
+
+#editor:focus {
+    outline: none;
+}
+
+#preview {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    font-size: 15px;
+    line-height: 1.7;
+    background-color: #fafafa;
+    border-left: 1px solid #e0e0e0;
+    /* ★追加: プレビューエリアはテキスト選択を許可 */
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+}
+
+.markdown-textarea {
+    font-family: "SFMono-Regular", Consolas, "Courier New", "Hiragino Kaku Gothic ProN", "Meiryo", monospace;
+    resize: none;
+}
+
+/* Markdown Preview Styling */
+#preview h1 {
+    font-size: 2em;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 0.3em;
+    margin-top: 0.67em;
+    margin-bottom: 0.67em;
+}
+
+#preview h2 {
+    font-size: 1.75em;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.3em;
+    margin-top: 0.83em;
+    margin-bottom: 0.83em;
+}
+
+#preview h3 {
+    font-size: 1.5em;
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+#preview h4 {
+    font-size: 1.25em;
+    margin-top: 1.33em;
+    margin-bottom: 1.33em;
+}
+
+#preview h5 {
+    font-size: 1.1em;
+    margin-top: 1.67em;
+    margin-bottom: 1.67em;
+}
+
+#preview h6 {
+    font-size: 1em;
+    color: #666;
+    margin-top: 2.33em;
+    margin-bottom: 2.33em;
+}
+
+#preview p {
+    margin: 0.5em 0;
+}
+
+#preview ul, #preview ol {
+    margin: 0.5em 0;
+    padding-left: 2em;
+}
+
+#preview li {
+    margin: 0.25em 0;
+}
+
+#preview code {
+    background-color: #f5f5f5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: "SFMono-Regular", Consolas, "Courier New", "Hiragino Kaku Gothic ProN", "Meiryo", monospace;
+    font-size: 0.95em;
+}
+
+#preview pre {
+    background-color: #2d2d2d;
+    color: #f8f8f2;
+    padding: 12px 15px;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin: 1em 0;
+    line-height: 1.4;
+}
+
+#preview pre code {
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+    color: inherit;
+}
+
+#preview blockquote {
+    border-left: 4px solid #007acc;
+    padding-left: 1em;
+    margin-left: 0;
+    color: #666;
+    font-style: italic;
+}
+
+#preview table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+
+#preview th, #preview td {
+    border: 1px solid #d9d9d9;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+#preview th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+}
+
+#preview a {
+    color: #007acc;
+    text-decoration: none;
+}
+
+#preview a:hover {
+    text-decoration: underline;
+}
+
+#preview strong {
+    font-weight: bold;
+}
+
+#preview em {
+    font-style: italic;
+}
+
+#preview hr {
+    border: none;
+    border-top: 2px solid #e0e0e0;
+    margin: 1.5em 0;
+}
+
+/* 設定タブ用のスタイル */
+.settings-view-content {
+    padding: 20px 40px;
+    background-color: #ffffff;
+    overflow-y: auto;
+    flex-grow: 1;
+    /* ★追加: 設定画面も値をコピーしたい場合があるので選択可に */
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+}
+
+.settings-view-content.content-hidden {
+    display: none;
+}
+
+.settings-view-content h1 {
+    margin-top: 0;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+}
+
+.settings-view-content h2 {
+    margin-top: 30px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.settings-view-content .setting-item {
+    margin-bottom: 15px;
+}
+
+.settings-view-content .setting-item label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.settings-view-content .setting-item input[type="text"],
+.settings-view-content .setting-item select {
+    width: 300px;
+    padding: 5px;
+    font-size: 14px;
+}
+
+.settings-view-content .setting-item input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+/* ========== 右ペイン ========== */
+.right-pane {
+    width: 350px;
+    background-color: #1e1e1e;
+    color: #cccccc;
+    border-left: 1px solid #d9d9d9;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: opacity 0.2s ease;
+    position: fixed;
+    top: 40px;
+    right: var(--activitybar-width);
+    bottom: 24px;
+    overflow: hidden;
+}
+
+.right-pane.hidden {
+    width: 0;
+    opacity: 0;
+    border: none;
+    overflow: hidden;
+}
+
+.terminal-header {
+    padding: 0;
+    background-color: #252526;
+    border-bottom: 1px solid #333;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Terminal Tabs */
+.terminal-tabs-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.terminal-tabs-list {
+    display: flex;
+    height: 100%;
+    overflow-x: auto;
+    flex: 1;
+}
+
+.terminal-tab {
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    height: 100%;
+    background-color: #2d2d2d;
+    border-right: 1px solid #1e1e1e;
+    color: #969696;
+    cursor: pointer;
+    font-size: 12px;
+    user-select: none;
+    max-width: 150px;
+    min-width: 80px;
+}
+
+.terminal-tab.active {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border-top: 1px solid #007acc;
+}
+
+.terminal-tab:hover:not(.active) {
+    background-color: #333;
+}
+
+.terminal-tab-title {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 5px;
+}
+
+.terminal-tab-close {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    border-radius: 3px;
+    opacity: 0;
+}
+
+.terminal-tab:hover .terminal-tab-close,
+.terminal-tab.active .terminal-tab-close {
+    opacity: 1;
+}
+
+.terminal-tab-close:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* New Terminal Button & Dropdown */
+.new-terminal-container {
+    display: flex;
+    align-items: center;
+    padding: 0 5px;
+}
+
+#new-terminal-btn, #dropdown-toggle {
+    background: none;
+    border: none;
+    color: #cccccc;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 6px;
+    border-radius: 3px;
+}
+
+#new-terminal-btn:hover, #dropdown-toggle:hover {
+    background-color: #3e3e3e;
+}
+
+#shell-dropdown {
+    position: fixed;
+    background-color: #252526;
+    border: 1px solid #454545;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    z-index: 1000;
+    min-width: 150px;
+    padding: 4px 0;
+}
+
+#shell-dropdown .dropdown-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #cccccc;
+}
+
+#shell-dropdown .dropdown-item:hover {
+    background-color: #007acc;
+    color: white;
+}
+
+#terminal-container {
+    flex-grow: 1;
+    overflow: hidden;
+    position: relative;
+    background-color: #1e1e1e;
+}
+
+.terminal-instance {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Ensure scrolling is handled by xterm */
+    overflow: hidden; 
+}
+
+.terminal-content {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    font-size: 14px;
+    flex-grow: 1;
+    overflow: hidden; /* xterm handles scroll */
+    height: 100%;
+    /* ★追加: ターミナルはテキスト選択を許可 */
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+}
+
+.terminal-content .prompt {
+    color: #4CAF50;
+}
+
+/* リサイザー */
+.resizer {
+    position: fixed;
+    background-color: #d9d9d9;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+}
+
+#resizer-right {
+    top: 40px;
+    bottom: 24px;
+    width: 4px;
+    right: calc(350px + var(--activitybar-width));
+    cursor: col-resize;
+}
+
+#resizer-right:hover,
+#resizer-right.resizing {
+    opacity: 1;
+    background-color: #0078d4;
+}
+
+#resizer-bottom {
+    /* ★修正: 左ペインの幅を考慮して開始位置を調整 */
+    left: calc(var(--activitybar-width) + var(--current-left-pane-width));
+    right: 0; /* bottom-paneに合わせて右端まで */
+    height: 4px;
+    /* 初期位置はJSで制御される場合もあるがCSSでも指定 */
+    top: calc(100vh - 200px - 24px); 
+    cursor: row-resize;
+    /* トランジションを追加してサイドバー開閉時にスムーズに動くようにする */
+    transition: left 0.2s ease, top 0.2s ease, opacity 0.2s ease; 
+}
+
+#resizer-bottom:hover,
+#resizer-bottom.resizing {
+    opacity: 1;
+    background-color: #0078d4;
+}
+
+/* ========== 下ペイン ========== */
+.bottom-pane {
+    height: 200px;
+    /* widthはデフォルトでauto、固定配置 */
+    background-color: #1e1e1e;
+    color: #cccccc;
+    border-top: 1px solid #d9d9d9;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: height 0.2s ease, opacity 0.2s ease, left 0.2s ease;
+    position: fixed;
+    bottom: 24px;
+    /* ★修正: 左サイドバーの幅を考慮して開始位置を調整 */
+    left: calc(var(--activitybar-width) + var(--current-left-pane-width));
+    right: 0;
+    z-index: 1; 
+}
+
+.bottom-pane.hidden {
+    height: 0;
+    opacity: 0;
+    border: none;
+    overflow: hidden;
+}
+
+/* ★修正: bottom-paneのヘッダーもright-paneと同じスタイルを適用するため、個別のpadding等を削除 */
+/* .bottom-pane .terminal-header { */
+    /* padding: 5px 15px;  <- 削除 */
+    /* font-size: 13px;    <- 削除 */
+    /* border-bottom: 1px solid #444; <- terminal-headerクラスで定義済み */
+/* } */
+
+#terminal-bottom-container {
+    flex-grow: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* ========== ステータスバー ========== */
+.status-bar {
+    height: 24px;
+    background-color: #007acc;
+    color: white;
+    padding: 0 15px;
+    line-height: 24px;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    flex-shrink: 0;
+    transition: height 0.2s ease, opacity 0.2s ease;
+    /* ステータスバーは一番手前 */
+    position: relative; 
+    z-index: 10;
+}
+
+.status-bar .icon {
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+.status-left {
+    flex: 1;
+}
+
+.status-right {
+    text-align: right;
+}
+
+/* ========== ユーティリティクラス ========== */
+.hidden {
+    width: 0 !important;
+    height: 0 !important;
+    opacity: 0;
+    padding: 0;
+    border: none;
+    overflow: hidden;
+}
+
+.right-pane > .hidden {
+    display: none !important;
+}
+
+.content-hidden {
+    display: none;
+}
+
+/* ========== Zenモード ========== */
+.ide-container.zen-mode-active .top-bar,
+.ide-container.zen-mode-active .editor-tabs,
+.ide-container.zen-mode-active .toolbar,
+.ide-container.zen-mode-active .activity-bar,
+.ide-container.zen-mode-active .left-pane,
+.ide-container.zen-mode-active .right-pane,
+.ide-container.zen-mode-active .bottom-pane,
+.ide-container.zen-mode-active .status-bar,
+.ide-container.zen-mode-active .right-activity-bar {
+    width: 0;
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    border: none;
+    padding: 0;
+}
+
+.ide-container.zen-mode-active .main-content {
+    margin: 0;
+}
+
+.ide-container.zen-mode-active .editor-area {
+    padding: 40px 60px;
+}
+
+.ide-container.zen-mode-active .settings-view-content {
+    display: none;
+}
+
+/* ★追加: Zenモード時、リサイザーも非表示/位置リセット */
+.ide-container.zen-mode-active #resizer-right,
+.ide-container.zen-mode-active #resizer-bottom {
+    display: none !important;
+    opacity: 0 !important;
+}
+
+/* ★追加: Zenモード時、中央ペインが全幅を占めるように flex-grow を強制 */
+.ide-container.zen-mode-active .center-pane {
+    flex-grow: 1;
+    width: 100%;
+}
+
+/* ========== PDF Preview ========== */
+.pdf-preview-header {
+    padding: 8px 12px;
+    background-color: #2c3e50;
+    color: white;
+    font-weight: bold;
+    border-bottom: 1px solid #34495e;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pdf-preview-header.hidden {
+    display: none;
+}
+
+.pdf-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.pdf-controls button {
+    background-color: #34495e;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.pdf-controls button:hover {
+    background-color: #415668;
+}
+
+.pdf-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#pdf-page-info {
+    font-size: 12px;
+    min-width: 60px;
+    text-align: center;
+    /* ★追加: ページ番号はコピーしたい場合があるので選択可にしてもよいが、UI的なので一応そのままか、textにする */
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.pdf-preview-content {
+    background-color: #525252;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 10px 0;
+}
+
+.pdf-page-canvas {
+    border: 1px solid #ccc;
+    background-color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    max-width: 95%;
+    height: auto;
+    margin-bottom: 10px;
+}
+
+/* VS Code風の新規作成入力ボックス */
+.tree-item.creation-mode {
+    display: flex;
+    align-items: center;
+    padding: 2px 6px 2px 20px;
+}
+
+.creation-input {
+    flex: 1;
+    background-color: #ffffff;
+    color: #333;
+    border: 1px solid #007acc;
+    padding: 2px 4px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    margin-left: 5px;
+    border-radius: 2px;
+    min-width: 0;
+    /* ★追加: 入力欄は選択可 */
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+}
+
+/* 右クリックメニュー */
+.context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #ccc;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+    min-width: 120px;
+    border-radius: 3px;
+    padding: 4px 0;
+}
+
+.context-menu-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #333;
+}
+
+.context-menu-item:hover {
+    background-color: #007acc;
+    color: white;
+}
+
+/* 文字アイコン（JS, TS, # 等）の調整 */
+.file-icon-styled {
+    font-size: 11px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-weight: 700;
+}
+
+/* カスタムモーダル */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 300px;
+    max-width: 90%;
+}
+
+.modal-message {
+    margin-bottom: 20px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.modal-btn {
+    padding: 6px 12px;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.modal-btn.primary {
+    background-color: #e81123;
+    color: white;
+    border-color: #d0101f;
+}
+
+.modal-btn:hover {
+    opacity: 0.9;
+}
+
+/* ========== リサイズ中の制御 ========== */
+/* リサイズ操作中に背面の要素が選択されたり反応したりするのを防ぐ */
+body.is-resizing-col,
+body.is-resizing-row {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body.is-resizing-col {
+    cursor: col-resize !important;
+}
+
+body.is-resizing-row {
+    cursor: row-resize !important;
+}
+
+/* 全要素のポインターイベントを無効化することで、
+   ドラッグ中にiframeや他の要素にイベントを奪われるのを防ぐ */
+body.is-resizing-col *,
+body.is-resizing-row * {
+    pointer-events: none !important;
+}
